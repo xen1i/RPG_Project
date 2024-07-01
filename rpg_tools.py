@@ -651,7 +651,7 @@ class RPG_tools:
             player_cur=combat["players"][0]
             player_cur["current_health"]-=dealt_damage
 
-            kills=enemy_cur["current_health"]<=0
+            kills=player_cur["current_health"]<=0
 
             crit_prefix=""
             if crits:
