@@ -127,12 +127,13 @@ class RPG_tools:
                         desc+="  - "+", ".join([f"{i}: {scalings[i]*100}%" if scalings[i]!=0 else "" for i in scalings.keys()])+"\n"
                     if att.can_crit:
                         crit_chance=stats_dict["Critical Hit Chance"]
-                        desc+=f"- Can critical strike: {round((1-0.5**(crit_chance/40.0))*100,2)}% (depends on your crit chance)\n"
+                        desc+=f"- Can critical strike: {round((1-0.5**(crit_chance/80.0))*100,2)}% (depends on your crit chance)\n"
                     if att.is_piercing:
+                        pen=stats_dict["Wielding"]*0.5
                         if att.can_crit:
-                            desc+=" and pierce through armor/ willpower"
+                            desc+=f" and pierce through armor/ willpower by roughly {pen} points of resistance"
                         else:
-                            desc+=" - Can piece through armor/ willpower"
+                            desc+=f" - Can piece through armor/ willpower by roughly {pen} points of resistance"
                     if att.can_crit or att.is_piercing:
                         desc+="\n"
                     desc+="\n"
@@ -369,7 +370,7 @@ class RPG_tools:
                 await ctx.channel.send(f"Battle emerges between {self.client.get_user(combatant).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
         else: 
             data["combat_scouting"][str(player[3])]=str(player[0])
-            await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
+            #await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
             self.db_cur.execute(f"SELECT user_id,user_name FROM character WHERE located={player[3]} and (not user_id={player[0]}) and user_level<={player[1]+2}")
             if self.db_cur.rowcount==0:
                 await ctx.response.send_message("There is no one in your league, who is currently at your position",ephemeral=True)
@@ -742,7 +743,7 @@ def calc_ability_damage(data, player_stats,enemy_stats,att_num):
 
     print(f"raw damage: {dealt_physical_raw} {dealt_magical_raw}")
 
-    crits = random.random()>0.5**(player_stats["Critical Hit Chance"]/40.0)
+    crits = random.random()>0.5**(player_stats["Critical Hit Chance"]/80.0)
     if crits:
         dealt_physical_raw*=1+math.log2(player_stats["Critical Hit Damage"]+1)
         dealt_magical_raw*=1+math.log2(player_stats["Critical Hit Damage"]*0.9+1)
@@ -754,7 +755,7 @@ def calc_ability_damage(data, player_stats,enemy_stats,att_num):
 
     print(f"resistances: {armor_after_pen} {magir_after_pen}")
 
-    dodges= random.random()<(1-(0.5**(enemy_stats["Dexterity"]/60.0)))/4
+    dodges= random.random()<(1-(0.5**(enemy_stats["Dexterity"]/80.0)))/4
 
     dealt_physical=dealt_physical_raw/(1+math.sqrt(armor_after_pen)/8)
     dealt_magical=dealt_magical_raw/(1+math.sqrt(magir_after_pen)/6)
