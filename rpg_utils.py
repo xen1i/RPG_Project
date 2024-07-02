@@ -45,7 +45,6 @@ def get_player_stat_dict(db_cursor,player_id):
     for i in all_stats:
         if not i in stats_dict:
             stats_dict[i]=0
-    stats_dict["Health"]+=100
     stats_dict["Strength"]+=10
     for i in stats_dict.keys():
         if i!="Cosmic Blessing":
@@ -100,7 +99,7 @@ def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = Fal
     p1_d={}
     p1_data=get_player_stat_dict(db_cursor,player1)
     p1_d["id"]=str(player1)
-    p1_d["current_health"]=p1_data["Health"]*3
+    p1_d["current_health"]=p1_data["Health"]*3+100
     p1_d["current_mana"]=3
 
     combat["players"].append(p1_d)
@@ -109,7 +108,7 @@ def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = Fal
     p2_d={}
     p2_data=get_player_stat_dict(db_cursor,player2)
     p2_d["id"]=str(player2)
-    p2_d["current_health"]=p2_data["Health"]
+    p2_d["current_health"]=p2_data["Health"]*3+100
     p2_d["current_mana"]=3
 
     combat["players"].append(p2_d)
