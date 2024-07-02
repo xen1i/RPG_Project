@@ -65,6 +65,6 @@ class attack:
         if "physical_damage" in data:
             self.physical_damage=data["physical_damage"].copy()
         if "magic_damage" in data:
-            self.physical_damage=data["magic_damage"].copy()
+            self.magic_damage=data["magic_damage"].copy()
 
 
