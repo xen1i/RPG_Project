@@ -120,11 +120,11 @@ class RPG_tools:
                     if len(att.physical_damage)>0:
                         scalings=att.physical_damage
                         desc+=" - Deals physical damage\n"
-                        desc+="  - "+", ".join([f"{i}: {scalings[i]*100}%" if scalings[i]!=0 else "" for i in att.physical_damage.keys()])+"\n"
+                        desc+="  - "+", ".join([f"{i}: {scalings[i]*100}%" if scalings[i]!=0 else "" for i in scalings.keys()])+"\n"
                     if len(att.magic_damage)>0:
                         scalings=att.magic_damage
                         desc+=" - Deals magic damage\n"
-                        desc+="  - "+", ".join([f"{i}: {scalings[i]*100}%" if scalings[i]!=0 else "" for i in att.physical_damage.keys()])+"\n"
+                        desc+="  - "+", ".join([f"{i}: {scalings[i]*100}%" if scalings[i]!=0 else "" for i in scalings.keys()])+"\n"
                     if att.can_crit:
                         crit_chance=stats_dict["Critical Hit Chance"]
                         desc+=f"- Can critical strike: {round((1-0.5**(crit_chance/40.0))*100,2)}% (depends on your crit chance)\n"
