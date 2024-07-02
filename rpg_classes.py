@@ -1,3 +1,7 @@
+#
+# Copyright 2024 - Caspar Moritz Klein & Kseniia Kukushkina
+#  Mini licence: Don't distribute or modify the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and every participant gets their own copy via the original source of distribution)
+#
 from rpg_utils import load_json,dump_json,apply_scalings
 import discord
 import random
