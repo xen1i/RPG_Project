@@ -187,7 +187,12 @@ class RPG_tools:
         player=await self.print_character_creation_prompt(ctx)
         if not player:
             return
-        info_embed=discord.Embed(title=f"{player[2]} - Level {player[1]}")
+        data=load_json()
+        level_progress=""
+        if str(player[0]) in data["player_experience"]:
+            a=data["player_experience"][str(player[0])]/(player[1]+1)
+            level_progress = f" ({round(a*100,1)}% towards next level)"
+        info_embed=discord.Embed(title=f"{player[2]} - Level {player[1]}{level_progress}")
         stats_dict=get_player_stat_dict(self.db_cur,player[0])
         self.db_cur.execute("SELECT stat_name,stat_description from stats ORDER BY stat_name ASC")
         all_stats=self.db_cur.fetchall()
