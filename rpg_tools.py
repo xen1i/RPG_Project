@@ -29,10 +29,11 @@ class RPG_tools:
             self.db=db_connect.connect(load_config())
             if self.db:
                 self.db_cur=self.db.cursor()
+                self.db_cur.execute(f"SELECT * FROM character u WHERE u.user_id={user_id}")
         finally:
             if not self.db:
                 return None
-            if self.db_cur.rowcount==0:
+            if self.db_cur.rowcount<=0:
                 return None
             return self.db_cur.fetchone()
 
