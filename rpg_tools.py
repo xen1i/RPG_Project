@@ -356,7 +356,7 @@ class RPG_tools:
         
         if str(player[3]) in data["combat_scouting"]:
             combatant=data["combat_scouting"][str(player[3])]
-            combatant_name=self.check_character_existing(combatant)
+            combatant_name=await self.check_character_existing(combatant)
             if combatant_name:
                 combatant_name=combatant_name[2]
             else:
@@ -375,7 +375,7 @@ class RPG_tools:
                 await ctx.response.send_message(f"{combatant_name} was already scouting at {location_name}. {player[2]} is challenging them!",ephemeral=True)
                 await ctx.channel.send(f"Battle emerges between {self.client.get_user(combatant).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
         else: 
-            data["combat_scouting"][str(player[3])]=str(player[0])
+            #data["combat_scouting"][str(player[3])]=str(player[0])
             #await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
             self.db_cur.execute(f"SELECT user_id,user_name FROM character WHERE located={player[3]} and (not user_id={player[0]}) and user_level<={player[1]+2}")
             if self.db_cur.rowcount==0:
