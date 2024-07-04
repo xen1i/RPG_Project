@@ -8,6 +8,7 @@ from discord import ui
 import json
 import random
 import time as time
+import psycopg2
 
 from config import load_config
 import db_connect
@@ -19,11 +20,13 @@ plugin_name="RPG_tools"
 
 class RPG_tools:
     client:discord.Client=None
-    db=None
+    db:psycopg2.extensions.connection=None
     db_cur=None
 
     async def check_character_existing(self,user_id:int):
         try:
+            if self.db.closed:
+                a=1/0
             self.db_cur.execute(f"SELECT * FROM character u WHERE u.user_id={user_id}")
         except:
             self.db=db_connect.connect(load_config())
