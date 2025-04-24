@@ -1,19 +1,11 @@
 #
-# Copyright 2024 - Caspar Moritz Klein & Kseniia Kukushkina
+# Copyright 2024 - Caspar Moritz Klein & Xenia Kukushkina
 #  Mini licence: Don't distribute or modify the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and every participant gets their own copy via the original source of distribution)
 #
-import json
 import random
 import math
-data_path="datafiles/rpg_data.json"
-
-def load_json():
-    with open(data_path, "r") as f:
-        return json.load(f)
-
-def dump_json(data):
-    with open(data_path, "w") as f:
-        json.dump(data, f, indent=4)
+from rpg_json_utils import load_json,dump_json
+from rpg_classes import player_class
 
 def sanitize_input(text:str):
     invalid_characters=['\'']
@@ -113,11 +105,12 @@ def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = Fal
 
     combat["players"].append(p2_d)
 
+    player1_obj=player_class()
+    player1_obj.load_from_db(db_cursor,player1)
+
     # Init first turn
-    db_cursor.execute(f"SELECT class_name FROM user_information WHERE user_id={player1}")
-    p1=db_cursor.fetchone()
     combat["turn"] = 0
-    combat["current_attack_pool"] = create_attack_pool(p1[0])
+    combat["current_attack_pool"] = create_attack_pool(db_cursor,player1_obj.player_class)
 
 
 
@@ -147,25 +140,27 @@ def check_player_in_combat(player_id:int):
     d=load_json()
     return str(player_id) in d["player_fight_involvement"]
 
-def create_attack_pool(class_name: str):
-    data = load_json()
+def create_attack_pool(db_cur,class_id : int):
     
-    class_info=data["classes"][class_name]
-    subclass = class_info["subclass"]
-    alignment = class_info["alignment"]
+    db_cur.execute("SELECT attack_id FROM class_full_attack_pool WHERE class_id=%s",(class_id,))
 
-    pool=[]
+    pool=db_cur.fetchall()
 
-    # Füge den Standard Pool in den Auswahlpool hinzu
-    pool.extend(data["attack_pools"]["general"])
+    pool=random.sample(pool,3)
 
-    # Füge den Pool der Oberklasse in den Auswahlpool hinzu
-    if subclass in data["attack_pools"]["subclass"]:
-        pool.extend(data["attack_pools"]["subclass"][subclass])
-    
-    # Füge den Pool der Oberklasse in den Auswahlpool hinzu
-    if alignment in data["attack_pools"]["alignment"]:
-        pool.extend(data["attack_pools"]["alignment"][alignment])
+    print("I created a pool :D ",pool)
 
-    return random.sample(pool,3)
-    
+    pool = [i[0] for i in pool]
+
+    return pool
+
+def db_exec_fetchone(db_cur,query):
+    db_cur.execute(query)
+    if db_cur.rowcount!=1:
+        print(f"db_exec_fetchone got {db_cur.rowcount} results instead of one, this should not happen")
+        return None
+    return db_cur.fetchone()
+
+def db_get_attack_by_name(db_cur,name):
+    db_cur.execute(f"SELECT * FROM attack WHERE attack.name='{name}'")
+    return db_cur.fetchone()

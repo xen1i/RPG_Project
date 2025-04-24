@@ -1,5 +1,5 @@
 #
-# Copyright 2024 - Caspar Moritz Klein & Kseniia Kukushkina
+# Copyright 2024 - Caspar Moritz Klein & Xenia Kukushkina
 #  Mini licence: Don't distribute or modify the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and every participant gets their own copy via the original source of distribution)
 #
 import discord
@@ -24,23 +24,25 @@ class RPG_tools:
     db_cur=None
 
     async def check_character_existing(self,user_id:int):
+        player = player_class()
         try:
             if self.db.closed:
                 a=1/0
-            self.db_cur.execute(f"SELECT * FROM character u WHERE u.user_id={user_id}")
+            player.load_from_db(self.db_cur,user_id)
         except:
             self.db=db_connect.connect(load_config())
             if self.db:
                 self.db_cur=self.db.cursor()
-                self.db_cur.execute(f"SELECT * FROM character u WHERE u.user_id={user_id}")
+                player.load_from_db(self.db_cur,user_id)
         finally:
             if not self.db:
                 return None
-            if self.db_cur.rowcount<=0:
+            if player.id==-1:
                 return None
-            return self.db_cur.fetchone()
+            return player
 
     async def print_character_creation_prompt(self,ctx:discord.Interaction):
+        print("processing new command")
         player= await self.check_character_existing(ctx.user.id)
         if player:
             return player
@@ -84,7 +86,6 @@ class RPG_tools:
 
         await ctx.response.send_message(f"Nice, you will be known as {desired_character_name}, after you choose your class:",view=sheet,ephemeral=True)
     	
-
     async def show_rpg_help(self,ctx:discord.Interaction):
         create_char_line="Here are some commands you might need:\n"
         if self.check_character_existing(ctx.user.id):
@@ -104,8 +105,8 @@ class RPG_tools:
         data = load_json()
 
         # The user is in an active fight
-        if str(ctx.user.id) in data["player_fight_involvement"]:
-            fight_name,enemy_id,myturn=get_combat_related_info(player[0])
+        if str(player.id) in data["player_fight_involvement"]:
+            fight_name,enemy_id,myturn=get_combat_related_info(player.id)
             combat=data["active_fights"][fight_name]
 
             enemy=await self.check_character_existing(int(enemy_id))
@@ -116,10 +117,12 @@ class RPG_tools:
                 infoEmbed.title="Your possible Actions:"
                 desc=""
                 counter=1
-                stats_dict=get_player_stat_dict(self.db_cur,player[0])
+                stats_dict=get_player_stat_dict(self.db_cur,player.id)
                 for i in combat["current_attack_pool"]:
                     att = attack()
-                    att.load_from_dict(data["attacks"][i])
+
+                    att.id=i
+                    att.load_from_db(self.db_cur)
                     desc+=f"{counter}: {att.name} - {att.description}\n"
                     if len(att.physical_damage)>0:
                         scalings=att.physical_damage
@@ -135,11 +138,11 @@ class RPG_tools:
                     if att.is_piercing:
                         pen=stats_dict["Wielding"]*0.5
                         if att.can_crit:
-                            desc+=f" and pierce through armor/ willpower by roughly {pen} points of resistance"
+                            desc+=f" and pierce through armor/ willpower by roughly {pen} points of resistance\n"
                         else:
-                            desc+=f" - Can piece through armor/ willpower by roughly {pen} points of resistance"
-                    if att.can_crit or att.is_piercing:
-                        desc+="\n"
+                            desc+=f" - Can piece through armor/ willpower by roughly {pen} points of resistance\n"
+                    #if att.can_crit or att.is_piercing:
+                    #    desc+="\n"
                     desc+="\n"
                     counter+=1
                 infoEmbed.description=desc
@@ -147,11 +150,11 @@ class RPG_tools:
                 infoEmbed.title="It is not your turn"
                 infoEmbed.description="You have to wait until your opponent makes their move."
 
-            await ctx.response.send_message(f"You are in a fight with {enemy[2]}.",embed=infoEmbed,ephemeral=True)
+            await ctx.response.send_message(f"You are in a fight with {enemy.name}.",embed=infoEmbed,ephemeral=True)
             return
         
         # The user has send an open request
-        if str(player[0]) in data["combat_requests"]:
+        if str(player.id) in data["combat_requests"]:
             contender_name="Sir-I-cannot-initialize-the-database-connection-alot"
             if self.db_cur:
                 cr=data["combat_requests"]
@@ -162,7 +165,7 @@ class RPG_tools:
             return
 
         # The user has received an open request
-        if str(player[0]) in data["incoming_requests"]:
+        if str(player.id) in data["incoming_requests"]:
             contender_name=["Mary-van-I-cannot-initialize-the-database-connection"]
             if self.db_cur:
                 ir=data["incoming_requests"]
@@ -176,28 +179,26 @@ class RPG_tools:
             return
 
         # The user is currently scouting for combat
-        if str(player[3]) in data["combat_scouting"] and data["combat_scouting"][str(player[3])]==str(ctx.user.id):
+        if str(player.location) in data["combat_scouting"] and data["combat_scouting"][str(player.location)]==str(player.id):
             loc_name="I-cannot-initialize-the-database-connection-city"
             if self.db_cur:
-                self.db_cur.execute(f"SELECT loc_name FROM user_information where user_id={ctx.user.id}")
+                self.db_cur.execute(f"SELECT loc_name FROM user_information where user_id={player.id}")
                 loc_name=self.db_cur.fetchone()[0]
-            await ctx.response.send_message(f"{player[2]} is currently scouting for combat at {loc_name}. You can stop scouting by using the /scout_battle command again",ephemeral=True)
+            await ctx.response.send_message(f"{player.name} is currently scouting for combat at {loc_name}. You can stop scouting by using the /scout_battle command again",ephemeral=True)
             return
         
-        await ctx.response.send_message(f"{player[2]} is neither challenged, challenges or battles, you might wanna change that.",ephemeral=True)
-
+        await ctx.response.send_message(f"{player.name} is neither challenged, challenges or battles, you might wanna change that.",ephemeral=True)
 
     async def show_user_info(self,ctx:discord.Interaction):
         player=await self.print_character_creation_prompt(ctx)
         if not player:
             return
-        data=load_json()
+        print("showing player data",player)
         level_progress=""
-        if str(player[0]) in data["player_experience"]:
-            a=data["player_experience"][str(player[0])]/(player[1]+1)
-            level_progress = f" ({round(a*100,1)}% towards next level)"
-        info_embed=discord.Embed(title=f"{player[2]} - Level {player[1]}{level_progress}")
-        stats_dict=get_player_stat_dict(self.db_cur,player[0])
+        a=player.level_progress/(player.level+1)
+        level_progress = f" ({round(a*100,1)}% towards next level)"
+        info_embed=discord.Embed(title=f"{player.name} - Level {player.level}{level_progress}")
+        stats_dict=get_player_stat_dict(self.db_cur,player.id)
         self.db_cur.execute("SELECT stat_name,stat_description from stats ORDER BY stat_name ASC")
         all_stats=self.db_cur.fetchall()
         all_stats=[(x[0],x[1]) for x in all_stats]
@@ -216,9 +217,6 @@ class RPG_tools:
 
         await ctx.response.send_message("Your info",ephemeral=True,embed=info_embed)
 
-
-
-
     async def show_user_location(self,ctx:discord.Interaction):
         player=await self.print_character_creation_prompt(ctx)
         print("location debug: "+str(player))
@@ -227,13 +225,13 @@ class RPG_tools:
         location_info=[]
         cur_location=None
         if self.db_cur:
-            self.db_cur.execute(f"SELECT loc_id,loc_name,loc_description,loc_level FROM location where loc_level<={player[1]} and loc_id!={player[3]}")
+            self.db_cur.execute(f"SELECT loc_id,loc_name,loc_description,loc_level FROM location where loc_level<={player.level} and loc_id!={player.location}")
             location_info=self.db_cur.fetchall()
-            self.db_cur.execute(f"SELECT l.loc_id,l.loc_name,l.loc_description,l.loc_level FROM location l JOIN character ON user_id={ctx.user.id} and located=l.loc_id")
+            self.db_cur.execute(f"SELECT l.loc_id,l.loc_name,l.loc_description,l.loc_level FROM location l WHERE {player.location}=l.loc_id")
             cur_location=self.db_cur.fetchone()
-        LocationEmbed=discord.Embed(title=f"{player[2]}'s location")
+        LocationEmbed=discord.Embed(title=f"{player.name}'s location")
         LocationEmbed.description=f"""
-        {player[2]}'s location is\n
+        {player.name}'s location is\n
         - {cur_location[0]}: {cur_location[1]} - Level {cur_location[3]}\n
               {cur_location[2]}
         """
@@ -259,14 +257,13 @@ class RPG_tools:
         no_loc_found = lambda: ctx.response.send_message(f"There is no location like that, that you are able to travel to. You searched for {target_location_r}.",ephemeral=True)
         if self.db_cur:
             if target_location.isnumeric():
-                self.db_cur.execute(f"SELECT loc_id, loc_name FROM location WHERE loc_level<={player[1]} and loc_id={int(target_location)}")
+                self.db_cur.execute(f"SELECT loc_id, loc_name FROM location WHERE loc_level<={player.level} and loc_id={int(target_location)}")
                 if self.db_cur.rowcount==0:
                     await no_loc_found()
                     return
                 loc=self.db_cur.fetchone()
             else:
-                print(f"SELECT loc_id, loc_name FROM location WHERE loc_level<={player[1]} and loc_name='{str(target_location)}'")
-                self.db_cur.execute(f"SELECT loc_id, loc_name FROM location WHERE loc_level<={player[1]} and loc_name='{str(target_location)}'")
+                self.db_cur.execute(f"SELECT loc_id, loc_name FROM location WHERE loc_level<=%s and loc_name=%s",(player.level,str(target_location)))
                 if self.db_cur.rowcount==0:
                     await no_loc_found()
                     return
@@ -274,7 +271,7 @@ class RPG_tools:
             print(f"UPDATE character SET located = {loc[0]} WHERE user_id={ctx.user.id}")
             self.db_cur.execute(f"UPDATE character SET located = {loc[0]} WHERE user_id={ctx.user.id};")
             self.db.commit()
-            await ctx.response.send_message(f"{player[2]} moved to {loc[1]}!")
+            await ctx.response.send_message(f"{player.name} moved to {loc[1]}!")
         else:
             await ctx.response.send_message(f"I, the bot, am not able to connect to the database :(")
             return
@@ -289,14 +286,14 @@ class RPG_tools:
         if not "last_scavange" in data:
             data["last_scavange"] = {}
         utime=time.time()
-        if not str(ctx.user.id) in data["last_scavange"]:
+        if not str(player.id) in data["last_scavange"]:
             pass # We can scavange
         else:
-            timediff=utime-data["last_scavange"][str(ctx.user.id)]
+            timediff=utime-data["last_scavange"][str(player.id)]
             if timediff<300:
                 await ctx.response.send_message(f"You cannot loot the location now. You have {int(300-timediff)}s left on the cooldown.",ephemeral=True)
                 return
-        data["last_scavange"][str(ctx.user.id)]=utime
+        data["last_scavange"][str(player.id)]=utime
         # Here comes the scavanging
         print("Fetching Items:")
         item_pool=[] ## [(index_db_ip,weight)]
@@ -307,7 +304,7 @@ class RPG_tools:
             for i in range(len(db_item_pool)):
                 level_weights=[0.4,0.7,1,0.2]
                 print(db_item_pool[i])
-                item_pool.append((i,level_weights[min(3,max(0,db_item_pool[i][6]+2))]))
+                item_pool.append((i,level_weights[min(3,max(0,db_item_pool[i][6]+2))]*db_item_pool[i][5]))
             summed_weight=sum([x[1] for x in item_pool])
             rand_choice=random.random()*summed_weight
             chosen=None
@@ -354,45 +351,44 @@ class RPG_tools:
 
         location_name="<The land without database connections>"
         if self.db_cur:
-            self.db_cur.execute(f"SELECT * FROM user_information WHERE user_id={player[0]}") # 3 for location name
+            self.db_cur.execute(f"SELECT * FROM user_information WHERE user_id={player.id}") # 3 for location name
             location_name=self.db_cur.fetchone()[3]
         
-        if str(player[3]) in data["combat_scouting"]:
-            combatant=data["combat_scouting"][str(player[3])]
+        if str(player.location) in data["combat_scouting"]:
+            combatant=data["combat_scouting"][str(player.location)]
             combatant_name=await self.check_character_existing(combatant)
             if combatant_name:
                 combatant_name=combatant_name[2]
             else:
-                del data["combat_scouting"][str(player[3])]
-                data["combat_scouting"][str(player[3])]=str(player[0])
-                await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
+                del data["combat_scouting"][str(player.location)]
+                data["combat_scouting"][str(player.location)]=str(player.id)
+                await ctx.response.send_message(f"{player.name} is now scouting for battle at {location_name}.",ephemeral=True)
                 dump_json()
                 return
 
-            if combatant==str(player[0]):
-                del data["combat_scouting"][str(player[3])]
-                await ctx.response.send_message(f"{player[2]} is no longer scouting for battle at {location_name}.",ephemeral=True)
+            if combatant==str(player.id):
+                del data["combat_scouting"][str(player.location)]
+                await ctx.response.send_message(f"{player.name} is no longer scouting for battle at {location_name}.",ephemeral=True)
             else:
-                init_combat(self.db_cur,data,combatant,player[0])
-                del data["combat_scouting"][str(player[3])]
-                await ctx.response.send_message(f"{combatant_name} was already scouting at {location_name}. {player[2]} is challenging them!",ephemeral=True)
+                init_combat(self.db_cur,data,combatant,player.id)
+                del data["combat_scouting"][str(player.location)]
+                await ctx.response.send_message(f"{combatant_name} was already scouting at {location_name}. {player.name} is challenging them!",ephemeral=True)
                 await ctx.channel.send(f"Battle emerges between {self.client.get_user(combatant).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
         else: 
             #data["combat_scouting"][str(player[3])]=str(player[0])
             #await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
-            self.db_cur.execute(f"SELECT user_id,user_name FROM character WHERE located={player[3]} and (not user_id={player[0]}) and user_level<={player[1]+2}")
+            self.db_cur.execute(f"SELECT user_id,user_name FROM character WHERE located=%s and (not user_id=%s) and user_level<=%s",(player.location,player.id,player.level+2))
             if self.db_cur.rowcount==0:
                 await ctx.response.send_message("There is no one in your league, who is currently at your position",ephemeral=True)
             else:
                 combatants=self.db_cur.fetchall()
                 enemy=random.choice(combatants)
-                init_combat(self.db_cur,data,player[0],enemy[0],automatic=True)
-                await ctx.channel.send(f"{enemy[1]}-Bot was already scouting at {location_name}. {player[2]} is challenging them!")
+                init_combat(self.db_cur,data,player.id,enemy[0],automatic=True)
+                await ctx.response.send_message(f"{enemy[1]}-Bot was already scouting at {location_name}. {player.name} is challenging them!")
                 await ctx.channel.send(f"Battle emerges between {enemy[1]}-Bot and {ctx.user.mention}! Pick your favorite and cheer them on!")
 
         dump_json(data)
         
-
     async def request_user_duel(self,ctx:discord.Interaction,target_player:str):
         # We make sure the caller has a character and is not in combat
         print("I recognize the duel attempt")
@@ -408,7 +404,7 @@ class RPG_tools:
         target_id=0
         target=None
         if self.db_cur:
-            self.db_cur.execute(f"SELECT * FROM character WHERE user_name='{target_player}'")
+            self.db_cur.execute(f"SELECT user_id,user_level,user_name FROM character WHERE user_name='{target_player}'")
             if self.db_cur.rowcount<1:
                 await ctx.response.send_message(f"There is no player named {target_player_r}",ephemeral=True)
                 return
@@ -422,14 +418,14 @@ class RPG_tools:
         data=load_json()
         accepted_req=False
 
-        id=str(player[0])
+        id=str(player.id)
 
         # The caller has incoming combat requests
         if id in data["incoming_requests"]:
             for i in data["incoming_requests"][id]:
                 # The incoming request from the person the caller is trying to challenge -> accept
                 if str(target_id)==i:
-                    init_combat(self.db_cur,data,target_id,player[0])
+                    init_combat(self.db_cur,data,target_id,player.id)
                     # remove all related requests
                     data["incoming_requests"][id].remove(i)
                     if i in data["combat_requests"]:
@@ -507,7 +503,6 @@ class RPG_tools:
 
         dump_json(data)
 
-
     async def user_equip_item(self,ctx:discord.Interaction,item:str):
         player=await self.print_character_creation_prompt(ctx)
         if not player:
@@ -520,11 +515,11 @@ class RPG_tools:
 
         if self.db_cur:
             if item.isnumeric():
-                self.db_cur.execute(f"SELECT equipped,equippable,item_name,item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player[0])} and item_id={item}")
+                self.db_cur.execute(f"SELECT equipped,equippable,item_name,item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player.id)} and item_id={item}")
                 if self.db_cur.rowcount>0:
                     item_info=self.db_cur.fetchone()
             else:
-                self.db_cur.execute(f"SELECT equipped,equippable,item_name,item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player[0])} and item_name='{item}'")
+                self.db_cur.execute(f"SELECT equipped,equippable,item_name,item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player.id)} and item_name='{item}'")
                 if self.db_cur.rowcount>0:
                     item_info=self.db_cur.fetchone() 
         else:
@@ -532,34 +527,34 @@ class RPG_tools:
             return
         
         if item_info==None:
-            await ctx.response.send_message(f"{player[2]} does not have an Item like that!",ephemeral=True)
+            await ctx.response.send_message(f"{player.name} does not have an Item like that!",ephemeral=True)
             return
 
         if item_info[1]==0:
-            await ctx.response.send_message(f"{player[2]} has a {item_info[2]}, but it's not an equippable item.",ephemeral=True)
+            await ctx.response.send_message(f"{player.name} has a {item_info[2]}, but it's not an equippable item.",ephemeral=True)
             return
 
         if not item_info[0]:
-            self.db_cur.execute(f"SELECT item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player[0])} and equipped and equippable={item_info[1]}")
+            self.db_cur.execute(f"SELECT item_id FROM character NATURAL JOIN owns NATURAL JOIN item WHERE user_id={str(player.id)} and equipped and equippable={item_info[1]}")
             if self.db_cur.rowcount>0:
                 old_equipped=self.db_cur.fetchone()
-                self.db_cur.execute(f"UPDATE owns SET equipped=False WHERE user_id={player[0]} and item_id={old_equipped[0]}")
-        self.db_cur.execute(f"UPDATE owns SET equipped=True WHERE user_id={player[0]} and item_id={item_info[3]}")
+                self.db_cur.execute(f"UPDATE owns SET equipped=False WHERE user_id={player.id} and item_id={old_equipped[0]}")
+        self.db_cur.execute(f"UPDATE owns SET equipped=True WHERE user_id={player.id} and item_id={item_info[3]}")
         self.db.commit()
-        await ctx.response.send_message(f"{player[2]} has successfully equipped {item_info[2]}!",ephemeral=True)
+        await ctx.response.send_message(f"{player.name} has successfully equipped {item_info[2]}!",ephemeral=True)
 
     async def user_use_attack(self,ctx:discord.Interaction,move:str):
         player=await self.print_character_creation_prompt(ctx)
         if not player:
             return
-        if not check_player_in_combat(player[0]):
+        if not check_player_in_combat(player.id):
             await ctx.response.send_message("You cannot do that, as you are not in combat!",ephemeral=True)
             return
 
         data=load_json()
         move_r=move
         move=sanitize_input(move_r)
-        combat_name, enemy_id, myturn = get_combat_related_info(player[0])
+        combat_name, enemy_id, myturn = get_combat_related_info(player.id)
         if not myturn:
             await ctx.response.send_message("It is not your turn, you have to wait for your opponent to make theirs first.",ephemeral=True)
             return
@@ -570,9 +565,10 @@ class RPG_tools:
         combat=data["active_fights"][combat_name]
     
         att = attack()
-        att.load_from_dict(data["attacks"][combat["current_attack_pool"][int(move)-1]])
+        att.id=combat["current_attack_pool"][int(move)-1]
+        att.load_from_db(self.db_cur)
 
-        player_stats=get_player_stat_dict(self.db_cur,player[0])
+        player_stats=get_player_stat_dict(self.db_cur,player.id)
         enemy_stats=get_player_stat_dict(self.db_cur,enemy_id)
 
         #Calculate Damage
@@ -587,7 +583,7 @@ class RPG_tools:
 
         kills=enemy_cur["current_health"]<=0
         
-        self.db_cur.execute(f"SELECT user_id,class_name,user_name FROM user_information WHERE user_id={enemy_id}")
+        self.db_cur.execute(f"SELECT user_id,class_id,user_name FROM user_information WHERE user_id={enemy_id}")
         enemy=self.db_cur.fetchone()
 
         print("combat: "+str(combat))
@@ -612,46 +608,45 @@ class RPG_tools:
         if kills:
             level_up = ""
             if "automatic" in combat and combat["automatic"]:
-                player_id=str(player[0])
+                player_id=str(player.id)
                 if not player_id in data["player_experience"]:
                     data["player_experience"][player_id]=1
                 else:
                     data["player_experience"][player_id]=data["player_experience"][player_id]+1
-                if data["player_experience"][player_id]>player[1]:
+                if data["player_experience"][player_id]>player.level:
                     #Level up
                     del data["player_experience"][player_id]
                     dump_json(data)
-                    self.db_cur.execute(f"UPDATE character SET user_level={player[1]+1} WHERE user_id={player_id}")
+                    self.db_cur.execute(f"UPDATE character SET user_level={player.level+1} WHERE user_id={player_id}")
                     level_up = "Congratulations! You leveled up!"
-            await ctx.response.send_message(crit_prefix+f"{player[2]} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {enemy[2]}. {player[2]} wins the combat!\n"+level_up)
+            await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {enemy[2]}. {player.name} wins the combat!\n"+level_up)
             combatants=combat["players"]
             c1=combatants[0]["id"]
             c2=combatants[1]["id"]
             turn=combat["turn"]
-            self.db_cur.execute(f"INSERT INTO battlelog (initiator_id,opponent_id,result) VALUES ({c1},{c2},{2-2*(turn%2)})")
+            self.db_cur.execute(f"INSERT INTO battlelog (initiator_id,opponent_id,result) VALUES (%s,%s,%s)",(c1,c2,2-2*(turn%2)))
             self.db.commit()
-            del data["player_fight_involvement"][str(player[0])]
+            del data["player_fight_involvement"][str(player.id)]
             if not ("automatic" in combat and combat["automatic"]):
                 del data["player_fight_involvement"][str(enemy[0])]
             del data["active_fights"][combat_name]
         else:
             if dodges:
-                await ctx.response.send_message(crit_prefix+f"{player[2]} used '{att.name}', but {enemy[2]} dodged the attack")
+                await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}', but {enemy[2]} dodged the attack")
             else:
-                await ctx.response.send_message(crit_prefix+f"{player[2]} used '{att.name}' and dealt {dealt_damage} damage to {enemy[2]}")
+                await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}' and dealt {dealt_damage} damage to {enemy[2]}")
             combat["turn"]+=1
             if "automatic" in combat and combat["automatic"]:
-                self.db_cur.execute(f"SELECT class_name FROM user_information WHERE user_id={player[0]}")
-                player_class=self.db_cur.fetchone()[0]
-                combat["current_attack_pool"]=create_attack_pool(player_class)
+                combat["current_attack_pool"]=create_attack_pool(self.db_cur,player.player_class)
             else:
-                combat["current_attack_pool"]=create_attack_pool(enemy[1])
+                combat["current_attack_pool"]=create_attack_pool(self.db_cur,enemy[1])
         
         if not kills and "automatic" in combat and combat["automatic"]:
             movenum=random.choice(range(3))
-            att_pool=create_attack_pool(enemy[1])
+            att_pool=create_attack_pool(self.db_cur,enemy[1])
             att = attack()
-            att.load_from_dict(data["attacks"][att_pool[movenum]])        
+            att.id=att_pool[movenum]
+            att.load_from_db(self.db_cur)        
             dealt_physical,dealt_magical,crits,dodges=calc_ability_damage(data,enemy_stats,player_stats,att_pool[movenum])
 
             dealt_damage = dealt_physical+dealt_magical
@@ -677,20 +672,20 @@ class RPG_tools:
                 dealt_damage=" + ".join(dmgs)
                 
             if kills:
-                ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {player[2]}. {enemy[2]} wins the combat!")
+                await ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {player.name}. {enemy[2]} wins the combat!")
                 combatants=combat["players"]
                 c1=combatants[0]["id"]
                 c2=combatants[1]["id"]
                 turn=combat["turn"]
                 self.db_cur.execute(f"INSERT INTO battlelog (initiator_id,opponent_id,result) VALUES ({c1},{c2},{2-2*(turn%2)})")
                 self.db.commit()
-                del data["player_fight_involvement"][str(player[0])]
+                del data["player_fight_involvement"][str(player.id)]
                 del data["active_fights"][combat_name]
             else:
                 if dodges:
-                    await ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}', but {player[2]} dodged the attack")
+                    await ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}', but {player.name} dodged the attack")
                 else:
-                    await ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}' and dealt {dealt_damage} damage to {player[2]}")
+                    await ctx.channel.send(crit_prefix+f"{enemy[2]} used '{att.name}' and dealt {dealt_damage} damage to {player.name}")
                 combat["turn"]+=1
 
         dump_json(data)
@@ -702,7 +697,7 @@ def link(commandTree:discord.app_commands.CommandTree, db):
     inst.client=commandTree.client
     inst.db=db
     inst.db_cur=db.cursor()
-
+ 
    # inst.client.event(inst.on_raw_reaction_add)
    # inst.client.event(inst.on_raw_reaction_remove)
 
@@ -723,20 +718,20 @@ def link(commandTree:discord.app_commands.CommandTree, db):
 
     com_user_create=discord.app_commands.Command(name="create_character",description="Enter your name, press enter and choose a class afterwards. Start playing now!",callback=inst.create_user_account)
 
-    commandTree.add_command(com_user_create)
-    commandTree.add_command(com_user_info)
-    commandTree.add_command(com_user_location)
-    commandTree.add_command(com_global_statistics)
-    commandTree.add_command(com_user_move)
-    commandTree.add_command(com_scavange)
-    commandTree.add_command(com_combat_duel)
-    commandTree.add_command(com_combat_local)
-    commandTree.add_command(com_combat_info)
-    commandTree.add_command(com_user_equip)
-    commandTree.add_command(com_user_attack)
+    commandTree.add_command(com_help) # incomplete
+    commandTree.add_command(com_user_info) # level, stats
+    commandTree.add_command(com_user_location) # how to get to which locations
+    commandTree.add_command(com_global_statistics) # incomplete
+    commandTree.add_command(com_user_move) # done
+    commandTree.add_command(com_scavange) # done
+    commandTree.add_command(com_combat_local) # done
+    commandTree.add_command(com_combat_duel) # done
+    commandTree.add_command(com_combat_info) # implemented, but unsatisfying
+    commandTree.add_command(com_user_equip) # wack
+    commandTree.add_command(com_user_attack) # ok
+    commandTree.add_command(com_user_create) # done
 
 
-    commandTree.add_command(com_help)
 
 
    # commandTree.add_command(com_sr)
