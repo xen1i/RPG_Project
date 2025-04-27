@@ -14,18 +14,12 @@ class class_choice_select(discord.ui.Select):
             return
 
         data = load_json()
-        print(str(interaction.user.id) in data["open_creation_prompts"])
-        print(str(interaction.user.id))
-        print(data)
         if "open_creation_prompts" in data:
             if str(interaction.user.id) in data["open_creation_prompts"]:
                 name = data["open_creation_prompts"][str(interaction.user.id)]
-                print(interaction.extras)
-                print(interaction.data)
-                print(f"INSERT INTO character VALUES ('{str(interaction.user.id)}',1,'{name}',0,{int(interaction.data['values'][0])})")
                 del data["open_creation_prompts"][str(interaction.user.id)]
                 dump_json(data)
-                self.plugin.db_cur.execute(f"INSERT INTO character VALUES ('{str(interaction.user.id)}',1,'{name}',0,{int(interaction.data['values'][0])})")
+                self.plugin.db_cur.execute(f"INSERT INTO character VALUES (%s,1,%s,0,%s)",(str(interaction.user.id),name,int(interaction.data['values'][0])))
                 self.plugin.db.commit()
                 weird_announcements=["They are still young, but will conquer the world sooner or later.","Keep an eye on them or they will throw you from your throne.", "Wish them luck in these harsh lands"]
                 await interaction.response.send_message(f"Behold the all mighty {name}! "+weird_announcements[random.randint(0,len(weird_announcements)-1)])
