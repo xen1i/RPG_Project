@@ -299,7 +299,7 @@ class RPG_tools:
         item_pool=[] ## [(index_db_ip,weight)]
         db_item_pool=[]
         if self.db_cur:
-            self.db_cur.execute(f"SELECT * FROM valid_item_pools WHERE user_id={ctx.user.id}")
+            self.db_cur.execute(f"SELECT * FROM valid_item_pools WHERE user_id=%s",(ctx.user.id,))
             db_item_pool=self.db_cur.fetchall()
             for i in range(len(db_item_pool)):
                 level_weights=[0.4,0.7,1,0.2]
@@ -317,11 +317,11 @@ class RPG_tools:
                 print(chosen)
                 #The selected item is already present in the players inventory
                 if chosen[7]!=None:
-                    self.db_cur.execute(f"UPDATE owns SET item_amount={chosen[7]+1} WHERE item_id={chosen[2]} and user_id={chosen[0]};")
+                    self.db_cur.execute(f"UPDATE owns SET item_amount=%s WHERE item_id=%s and user_id=%s;",(chosen[7]+1,chosen[2],chosen[0]))
                     self.db.commit()
                 #The selected item is new to this player
                 else:
-                    self.db_cur.execute(f"INSERT INTO owns VALUES ({chosen[2]},{chosen[0]},{1},{False});")
+                    self.db_cur.execute(f"INSERT INTO owns VALUES (%s,%s,%s,%s);",(chosen[2],chosen[0],1,False))
                     self.db.commit()
 
                 item_embed=discord.Embed(title=chosen[3],description=chosen[8])
@@ -355,10 +355,11 @@ class RPG_tools:
             location_name=self.db_cur.fetchone()[3]
         
         if str(player.location) in data["combat_scouting"]:
-            combatant=data["combat_scouting"][str(player.location)]
-            combatant_name=await self.check_character_existing(combatant)
-            if combatant_name:
-                combatant_name=combatant_name[2]
+            combatant_id=data["combat_scouting"][str(player.location)]
+            combatant=await self.check_character_existing(combatant_id)
+            combatant_name=""
+            if combatant:
+                combatant_name=combatant.name
             else:
                 del data["combat_scouting"][str(player.location)]
                 data["combat_scouting"][str(player.location)]=str(player.id)
@@ -366,14 +367,14 @@ class RPG_tools:
                 dump_json()
                 return
 
-            if combatant==str(player.id):
+            if combatant_id==str(player.id):
                 del data["combat_scouting"][str(player.location)]
                 await ctx.response.send_message(f"{player.name} is no longer scouting for battle at {location_name}.",ephemeral=True)
             else:
-                init_combat(self.db_cur,data,combatant,player.id)
+                init_combat(self.db_cur,data,combatant_id,player.id)
                 del data["combat_scouting"][str(player.location)]
                 await ctx.response.send_message(f"{combatant_name} was already scouting at {location_name}. {player.name} is challenging them!",ephemeral=True)
-                await ctx.channel.send(f"Battle emerges between {self.client.get_user(combatant).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
+                await ctx.channel.send(f"Battle emerges between {self.client.get_user(combatant_id).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
         else: 
             #data["combat_scouting"][str(player[3])]=str(player[0])
             #await ctx.response.send_message(f"{player[2]} is now scouting for battle at {location_name}.",ephemeral=True)
@@ -422,36 +423,30 @@ class RPG_tools:
 
         # The caller has incoming combat requests
         if id in data["incoming_requests"]:
-            for i in data["incoming_requests"][id]:
+            for i_idx in range(len(data["incoming_requests"][id])):
+                i=data["incoming_requests"][id][i_idx]
+                
                 # The incoming request from the person the caller is trying to challenge -> accept
                 if str(target_id)==i:
-                    init_combat(self.db_cur,data,target_id,player.id)
-                    # remove all related requests
-                    data["incoming_requests"][id].remove(i)
-                    if i in data["combat_requests"]:
-                        del data["combat_requests"][i]
-                    accepted_req=True
-
+                    cancelled_req=""
                     # The caller had an outgoing combat request
                     if id in data["combat_requests"]:
 
                         # We find all info about the old target
                         old_target_id=data["combat_requests"][id]
                         old_target=await self.check_character_existing(old_target_id)
-                        del data["combat_requests"][id]
-                        # Delete the request for old target
-                        if str(old_target_id) in data["incoming_requests"]:
-                            if len(data["incoming_requests"][str(old_target_id)])<=1:
-                                del data["incoming_requests"][str(old_target_id)]
-                            else:
-                                data["incoming_requests"][str(old_target_id)].remove(id)
-                        name="<deleted-player>"
                         if old_target:
-                            name=old_target[2]
+                            cancelled_req=old_target.name
+                    init_combat(self.db_cur,data,target_id,player.id)
+
+                    accepted_req=True
+
+                    if cancelled_req:
                         await ctx.response.send_message(f"You have accepted the challenge and are now in battle with {target[2]}! This cancels your request to {name}.",ephemeral=True)
                     else:
                         await ctx.response.send_message(f"You have accepted the challenge and are now in battle with {target[2]}!",ephemeral=True)
                     await ctx.channel.send(f"Battle emerges between {self.client.get_user(target_id).mention} and {ctx.user.mention}! Pick your favorite and cheer them on!")
+                    break
                 # Else 10% to check if the player requesting still exists, 10% to save performance
                 elif random.random()>0.9:
                     if not self.check_character_existing(i):
@@ -460,7 +455,7 @@ class RPG_tools:
                         if i in data["combat_requests"]:
                             del data["combat_requests"][i]
             # If we cleared the list of requests, delete the entry
-            if len(data["incoming_requests"][id])==0:
+            if id in data["incoming_requests"] and len(data["incoming_requests"][id])==0:
                 del data["incoming_requests"][id]
 
         # We could not accept an incoming request, so we issue a new one
@@ -480,7 +475,7 @@ class RPG_tools:
                         data["incoming_requests"][str(old_target_id)].remove(id)
                 name="<deleted-player>"
                 if old_target:
-                    name=old_target[2]
+                    name=old_target.name
                 # If old target==new target, completely delete the request
                 if str(old_target_id)==str(target_id):
                     del data["combat_requests"][id]
@@ -608,6 +603,7 @@ class RPG_tools:
         if kills:
             level_up = ""
             if "automatic" in combat and combat["automatic"]:
+                #Get 1 xp and level up if player.xp == player.level
                 player_id=str(player.id)
                 if not player_id in data["player_experience"]:
                     data["player_experience"][player_id]=1
