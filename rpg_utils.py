@@ -164,3 +164,15 @@ def db_exec_fetchone(db_cur,query):
 def db_get_attack_by_name(db_cur,name):
     db_cur.execute(f"SELECT * FROM attack WHERE attack.name='{name}'")
     return db_cur.fetchone()
+
+def grant_player_xp(db_cur, player : player_class):
+    if player.level_progress+1>=player.level:
+        # Increase level by 1, set progress to 0
+        db_cur.execute(f"UPDATE character SET user_level=%s,user_level_progression=0 WHERE user_id=%s",(player.level+1,player.id))
+        player.level+=1
+        player.level_progress=0
+    else:
+        # Increase progress by 1
+        db_cur.execute(f"UPDATE character SET user_level_progression=%s WHERE user_id=%s",(player.level_progress+1,player.id))
+        player.level_progress+=1
+        return ""

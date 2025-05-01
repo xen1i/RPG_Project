@@ -90,10 +90,10 @@ class attack:
         self.is_piercing=res[2]
         self.can_crit=res[1]
         self.mana_cost=res[3]
-        cur.execute(f"SELECT s.stat_name, asw.damage_type, asw.factor "
-                    "FROM public.attack a "
-                    "NATURAL JOIN attack_scales_with asw "
-                    "NATURAL JOIN stats s WHERE a.name='{self.name}';")
+        cur.execute("""SELECT s.stat_name, asw.damage_type, asw.factor
+                    FROM public.attack a
+                    NATURAL JOIN attack_scales_with asw
+                    NATURAL JOIN stats s WHERE a.name=%s;""",(self.name,))
         res=cur.fetchall()
         for i in res:
             if i[1]==0:

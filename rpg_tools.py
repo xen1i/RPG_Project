@@ -567,7 +567,7 @@ class RPG_tools:
         enemy_stats=get_player_stat_dict(self.db_cur,enemy_id)
 
         #Calculate Damage
-        dealt_physical,dealt_magical,crits,dodges=calc_ability_damage(data,player_stats,enemy_stats,combat["current_attack_pool"][int(move)-1])
+        dealt_physical,dealt_magical,crits,dodges=calc_ability_damage(att,player_stats,enemy_stats)
 
         dealt_damage = dealt_physical+dealt_magical
 
@@ -604,17 +604,7 @@ class RPG_tools:
             level_up = ""
             if "automatic" in combat and combat["automatic"]:
                 #Get 1 xp and level up if player.xp == player.level
-                player_id=str(player.id)
-                if not player_id in data["player_experience"]:
-                    data["player_experience"][player_id]=1
-                else:
-                    data["player_experience"][player_id]=data["player_experience"][player_id]+1
-                if data["player_experience"][player_id]>player.level:
-                    #Level up
-                    del data["player_experience"][player_id]
-                    dump_json(data)
-                    self.db_cur.execute(f"UPDATE character SET user_level={player.level+1} WHERE user_id={player_id}")
-                    level_up = "Congratulations! You leveled up!"
+                level_up=grant_player_xp(self.db_cur,player)
             await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {enemy[2]}. {player.name} wins the combat!\n"+level_up)
             combatants=combat["players"]
             c1=combatants[0]["id"]
@@ -643,7 +633,7 @@ class RPG_tools:
             att = attack()
             att.id=att_pool[movenum]
             att.load_from_db(self.db_cur)        
-            dealt_physical,dealt_magical,crits,dodges=calc_ability_damage(data,enemy_stats,player_stats,att_pool[movenum])
+            dealt_physical,dealt_magical,crits,dodges=calc_ability_damage(att,enemy_stats,player_stats)
 
             dealt_damage = dealt_physical+dealt_magical
 
@@ -733,11 +723,7 @@ def link(commandTree:discord.app_commands.CommandTree, db):
    # commandTree.add_command(com_sr)
 
 # This has to be here because of some import shenanigans
-def calc_ability_damage(data, player_stats,enemy_stats,att_num):
-
-    att = attack()
-    att.load_from_dict(data["attacks"][att_num])
-
+def calc_ability_damage(att : attack, player_stats,enemy_stats):
     dealt_physical_raw=apply_scalings(player_stats,att.physical_damage)
     dealt_magical_raw=apply_scalings(player_stats,att.magic_damage)
 
