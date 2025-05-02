@@ -42,15 +42,17 @@ class player_combat_instance:
         pass
 
 class attack:
-    id:int = -1
-    name:str = ""
-    description:str
-    damage:float
-    is_piercing:bool = True
-    can_crit:bool = True
-    physical_damage={} # [(Statname,multiplier)]
-    magic_damage={}
-    mana_cost:int=0
+
+    def __init__(self):
+        self.id:int = -1
+        self.name:str = ""
+        self.description:str
+        self.damage:float
+        self.is_piercing:bool = True
+        self.can_crit:bool = True
+        self.physical_damage={} # [(Statname,multiplier)]
+        self.magic_damage={}
+        self.mana_cost:int=0
 
     def load_from_dict(self,data:dict):
         if "name" in data:
@@ -102,12 +104,14 @@ class attack:
                 self.magic_damage[i[0]]=i[2]
 
 class player_class:
-    id:int = -1
-    player_class:int
-    name:str
-    level:int
-    level_progress:int
-    location:int
+    def __init__(self):
+        self.id:int = -1
+        self.player_class:int
+        self.name:str
+        self.level:int
+        self.level_progress:int
+        self.location:int
+
     def load_from_db(self,cur,user_id):
         cur.execute(f"SELECT u.user_id,u.class,u.user_name,u.user_level,u.user_level_progression,u.located FROM character u WHERE u.user_id={user_id}")
         if cur.rowcount!=1:
