@@ -1,6 +1,6 @@
 #
-# Copyright 2024 - Caspar Moritz Klein & Xenia Kukushkina
-#  Mini licence: Don't distribute or modify the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and every participant gets their own copy via the original source of distribution)
+# Copyright 2025 - Caspar Moritz Klein & Xenia Kukushkina
+#  Mini licence: Don't distribute the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and everyone willing to modify the code can get their own copy via the original source of distribution)
 #
 import discord
 import discord.app_commands
@@ -702,6 +702,8 @@ def link(commandTree:discord.app_commands.CommandTree, db):
     com_user_attack=discord.app_commands.Command(name="use_move",description="Enter the number of the attack you've found in /my_combat_situation.",callback=inst.user_use_attack)
 
     com_user_create=discord.app_commands.Command(name="create_character",description="Enter your name, press enter and choose a class afterwards. Start playing now!",callback=inst.create_user_account)
+
+
 
     commandTree.add_command(com_help) # incomplete
     commandTree.add_command(com_user_info) # level, stats

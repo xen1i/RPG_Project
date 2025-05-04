@@ -1,6 +1,6 @@
 #
-# Copyright 2024 - Caspar Moritz Klein & Xenia Kukushkina
-#  Mini licence: Don't distribute or modify the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and every participant gets their own copy via the original source of distribution)
+# Copyright 2025 - Caspar Moritz Klein & Xenia Kukushkina
+#  Mini licence: Don't distribute the code, don't act like it's yours, but have fun with it alone if you wish! Also as long as the code is public, it is free to use (privately and everyone willing to modify the code can get their own copy via the original source of distribution)
 #
 import random
 import math
@@ -171,6 +171,7 @@ def grant_player_xp(db_cur, player : player_class):
         db_cur.execute(f"UPDATE character SET user_level=%s,user_level_progression=0 WHERE user_id=%s",(player.level+1,player.id))
         player.level+=1
         player.level_progress=0
+        return "Congratulations! You leveled up!"
     else:
         # Increase progress by 1
         db_cur.execute(f"UPDATE character SET user_level_progression=%s WHERE user_id=%s",(player.level_progress+1,player.id))
