@@ -23,6 +23,10 @@ class RPG_tools:
     db:psycopg2.extensions.connection=None
     db_cur=None
 
+    def reconnect(self):
+        self.db=db_connect.connect(load_config())
+
+
     async def check_character_existing(self,user_id:int):
         player = player_class()
         try:
@@ -30,7 +34,7 @@ class RPG_tools:
                 a=1/0
             player.load_from_db(self.db_cur,user_id)
         except:
-            self.db=db_connect.connect(load_config())
+            self.reconnect()
             if self.db:
                 self.db_cur=self.db.cursor()
                 player.load_from_db(self.db_cur,user_id)
@@ -242,7 +246,33 @@ class RPG_tools:
         await ctx.response.send_message("Here is your information:",embed=LocationEmbed,ephemeral=True)
 
     async def show_global_stats(self,ctx:discord.Interaction):
-        pass
+        if self.db.closed:
+            self.reconnect()
+
+        stats_report=""
+
+        #Finding highest player level
+        self.db_cur.execute("SELECT MAX(user_level) FROM character;")
+        max_level=self.db_cur.fetchone()[0]
+
+        #Finding players with highest level
+        self.db_cur.execute("""
+                            SELECT user_id FROM character WHERE user_level=%s;
+                            """,(max_level,))
+        highest_users=self.db_cur.fetchall()
+
+        displayed_user=random.choice(highest_users)[0]
+        self.db_cur.execute("""
+                                SELECT class_name,loc_name FROM user_information WHERE user_id=%s
+                            """,(displayed_user,))
+        random_highest_user_info=self.db_cur.fetchone()
+
+        stats_report+= f"""The maximum level any champion has is {max_level}. There is/are {len(highest_users)} champions with this level.
+        A {random_highest_user_info[0]} of that level is located at {random_highest_user_info[1]}"""
+        if displayed_user==ctx.user.id:
+            stats_report+="""\nOh wait, that is you!"""
+
+        await ctx.response.send_message(stats_report,ephemeral=True)
 
     async def move_user_to_location(self,ctx:discord.Interaction,target_location:str):
         player=await self.print_character_creation_prompt(ctx)
@@ -577,7 +607,7 @@ class RPG_tools:
 
         kills=enemy_cur["current_health"]<=0
         
-        self.db_cur.execute(f"SELECT user_id,class_id,user_name FROM user_information WHERE user_id={enemy_id}")
+        self.db_cur.execute(f"SELECT user_id,class_id,user_name,user_level FROM character WHERE user_id={enemy_id}")
         enemy=self.db_cur.fetchone()
 
         print("combat: "+str(combat))
@@ -601,7 +631,7 @@ class RPG_tools:
 
         if kills:
             level_up = ""
-            if "automatic" in combat and combat["automatic"]:
+            if "automatic" in combat and combat["automatic"] and enemy["user_level"]>=player.level:
                 #Get 1 xp and level up if player.xp == player.level
                 level_up=grant_player_xp(self.db_cur,player)
             await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {enemy[2]}. {player.name} wins the combat!\n"+level_up)
