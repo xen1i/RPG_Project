@@ -631,7 +631,7 @@ class RPG_tools:
 
         if kills:
             level_up = ""
-            if "automatic" in combat and combat["automatic"] and enemy["user_level"]>=player.level:
+            if "automatic" in combat and combat["automatic"] and enemy[3]>=player.level:
                 #Get 1 xp and level up if player.xp == player.level
                 level_up=grant_player_xp(self.db_cur,player)
             await ctx.response.send_message(crit_prefix+f"{player.name} used '{att.name}' and dealt {dealt_damage} damage to and thus killed {enemy[2]}. {player.name} wins the combat!\n"+level_up)
