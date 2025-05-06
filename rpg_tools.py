@@ -613,7 +613,7 @@ class RPG_tools:
         print("combat: "+str(combat))
 
         if "automatic" in combat and combat["automatic"]:
-            enemy=(enemy[0],enemy[1],enemy[2]+"-Bot")
+            enemy=(enemy[0],enemy[1],enemy[2]+"-Bot",enemy[3])
 
         crit_prefix=""
         if crits:
