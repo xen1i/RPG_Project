@@ -99,7 +99,7 @@ class RPG_tools:
 
         await ctx.response.send_message(create_char_line+
                                          "/move - moves your character to a new location\n"
-                                         "/scavange - used to scavange for items at your current location, has a 5min cooldown\n"
+                                         "/scavenge - used to scavenge for items at your current location, has a 5min cooldown\n"
                                          "/engage_battle - used to search for player battles at your current location\n",ephemeral=True)
 
     async def show_user_combat(self,ctx:discord.Interaction):
@@ -312,13 +312,13 @@ class RPG_tools:
         if await self.print_player_in_combat_prompt(ctx):
             return
         data = load_json()
-        if not "last_scavange" in data:
-            data["last_scavange"] = {}
+        if not "last_scavenge" in data:
+            data["last_scavenge"] = {}
         utime=time.time()
-        if not str(player.id) in data["last_scavange"]:
-            pass # We can scavange
+        if not str(player.id) in data["last_scavenge"]:
+            pass # We can scavenge
         else:
-            timediff=utime-data["last_scavange"][str(player.id)]
+            timediff=utime-data["last_scavenge"][str(player.id)]
             if timediff<300:
                 await ctx.response.send_message(f"You cannot loot the location now. You have {int(300-timediff)}s left on the cooldown.",ephemeral=True)
                 return
@@ -607,7 +607,7 @@ class RPG_tools:
 
         kills=enemy_cur["current_health"]<=0
         
-        self.db_cur.execute(f"SELECT user_id,class_id,user_name,user_level FROM character WHERE user_id={enemy_id}")
+        self.db_cur.execute(f"SELECT user_id,class,user_name,user_level FROM character WHERE user_id={enemy_id}")
         enemy=self.db_cur.fetchone()
 
         print("combat: "+str(combat))

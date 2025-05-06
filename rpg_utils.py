@@ -52,6 +52,10 @@ def apply_scalings(player_stats:dict,scalings:dict):
             sum+=scalings[i]*player_stats[i]
     return sum
 
+def calc_player_max_health(player_stats : dict):
+    if "Health" in player_stats:
+        return player_stats["Health"]*3+100
+    return 0
 
 def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = False):
     combat_key=f"{player1}x{player2}"
@@ -91,7 +95,7 @@ def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = Fal
     p1_d={}
     p1_data=get_player_stat_dict(db_cursor,player1)
     p1_d["id"]=str(player1)
-    p1_d["current_health"]=p1_data["Health"]*3+100
+    p1_d["current_health"]=calc_player_max_health(p1_data)
     p1_d["current_mana"]=3
 
     combat["players"].append(p1_d)
@@ -100,7 +104,7 @@ def init_combat(db_cursor,data:dict,player1:int,player2:int,automatic:bool = Fal
     p2_d={}
     p2_data=get_player_stat_dict(db_cursor,player2)
     p2_d["id"]=str(player2)
-    p2_d["current_health"]=p2_data["Health"]*3+100
+    p2_d["current_health"]=calc_player_max_health(p2_data)
     p2_d["current_mana"]=3
 
     combat["players"].append(p2_d)
